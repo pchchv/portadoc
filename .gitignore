@@ -1,0 +1,13 @@
+*~
+*.*~
+*.swp
+SDL2.dll
+
+lib/
+zig-cache/
+zig-out/
+tests/db*
+
+.zig-cache/
+.zig-out/
+.vscode/
