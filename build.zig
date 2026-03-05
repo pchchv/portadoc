@@ -1,6 +1,7 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
+    const prefix = "./local";
     const target = b.standardTargetOptions(.{});
     var useVendorMupdf = true;
     std.fs.cwd().access("./deps/mupdf/Makefile", .{}) catch |err| {
@@ -26,4 +27,14 @@ pub fn build(b: *std.Build) void {
         make_args.append(allocator, "HAVE_X11=no") catch unreachable;
         make_args.append(allocator, "HAVE_GLUT=no") catch unreachable;
     }
+
+    make_args.append(allocator, "XCFLAGS=-w -DTOFU -DTOFU_CJK -DFZ_ENABLE_PDF=1 " ++
+        "-DFZ_ENABLE_XPS=0 -DFZ_ENABLE_SVG=0 -DFZ_ENABLE_CBZ=0 " ++
+        "-DFZ_ENABLE_IMG=0 -DFZ_ENABLE_HTML=0 -DFZ_ENABLE_EPUB=0") catch unreachable;
+    make_args.append(allocator, "tools=no") catch unreachable;
+    make_args.append(allocator, "apps=no") catch unreachable;
+
+    const prefix_arg = b.fmt("prefix={s}", .{prefix});
+    make_args.append(allocator, prefix_arg) catch unreachable;
+    make_args.append(allocator, "install") catch unreachable;
 }
