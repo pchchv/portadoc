@@ -37,6 +37,7 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
     var useVendorMupdf = true;
+    const location = "./deps/mupdf/local";
     std.fs.cwd().access("./deps/mupdf/Makefile", .{}) catch |err| {
         if (err == error.FileNotFound) {
             useVendorMupdf = false;
@@ -71,6 +72,7 @@ pub fn build(b: *std.Build) void {
     make_args.append(allocator, prefix_arg) catch unreachable;
     make_args.append(allocator, "install") catch unreachable;
 
+    const mupdf_build_step = b.addSystemCommand(make_args.items);
     const exe = b.addExecutable(.{
         .name = "fancy-cat",
         .root_module = b.createModule(.{
@@ -85,6 +87,16 @@ pub fn build(b: *std.Build) void {
     }
 
     exe.root_module.addAnonymousImport("metadata", .{ .root_source_file = b.path("build.zig.zon") });
+    if (useVendorMupdf) {
+        exe.step.dependOn(&mupdf_build_step.step);
+        addMupdfStatic(exe, b, location);
+        b.installArtifact(exe);
+        b.getInstallStep().dependOn(&mupdf_build_step.step);
+    } else {
+        addMupdfDynamic(exe, target.result);
+        b.installArtifact(exe);
+    }
+
     exe.addIncludePath(.{ .cwd_relative = "src/mupdf-z" });
     exe.addCSourceFile(.{ .file = .{ .cwd_relative = "src/mupdf-z/fitz-z.c" } });
 
