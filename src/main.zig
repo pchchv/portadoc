@@ -1,5 +1,29 @@
 const std = @import("std");
 
+const PackageName = enum { portadoc };
+
+const DependencyType = struct {
+    url: []const u8,
+    hash: []const u8,
+};
+
+const DependenciesType = struct {
+    vaxis: DependencyType,
+    fzwatch: DependencyType,
+    fastb64z: DependencyType,
+};
+
+const MetadataType = struct {
+    name: PackageName,
+    fingerprint: u64,
+    version: []const u8,
+    minimum_zig_version: []const u8,
+    dependencies: DependenciesType,
+    paths: []const []const u8,
+};
+
+const metadata: MetadataType = @import("metadata");
+
 pub fn main() !void {
     const args = try std.process.argsAlloc(std.heap.page_allocator);
     defer std.process.argsFree(std.heap.page_allocator, args);
