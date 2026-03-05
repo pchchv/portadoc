@@ -55,4 +55,8 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addAnonymousImport("metadata", .{ .root_source_file = b.path("build.zig.zon") });
     exe.addIncludePath(.{ .cwd_relative = "src/mupdf-z" });
     exe.addCSourceFile(.{ .file = .{ .cwd_relative = "src/mupdf-z/fitz-z.c" } });
+
+    const run_cmd = b.addRunArtifact(exe);
+    if (b.args) |args| run_cmd.addArgs(args);
+    b.step("run", "Run the app").dependOn(&run_cmd.step);
 }
