@@ -2,6 +2,15 @@ const std = @import("std");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
+    var useVendorMupdf = true;
+    std.fs.cwd().access("./deps/mupdf/Makefile", .{}) catch |err| {
+        if (err == error.FileNotFound) {
+            useVendorMupdf = false;
+        } else {
+            std.debug.print("Error: {s}\n", .{@errorName(err)});
+            return;
+        }
+    };
     const allocator = std.heap.page_allocator;
     var make_args: std.ArrayList([]const u8) = .empty;
     defer make_args.deinit(allocator);
