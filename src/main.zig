@@ -12,4 +12,12 @@ pub fn main() !void {
         try stderr.flush();
         return;
     }
+
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer {
+        const deinit_status = gpa.deinit();
+        if (deinit_status == .leak) {
+            std.log.err("memory leak", .{});
+        }
+    }
 }
