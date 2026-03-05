@@ -1,156 +1,123 @@
 const std = @import("std");
 
-// Although this function looks imperative, it does not perform the build
-// directly and instead it mutates the build graph (`b`) that will be then
-// executed by an external runner. The functions in `std.Build` implement a DSL
-// for defining build steps and express dependencies between them, allowing the
-// build runner to parallelize the build automatically (and the cache system to
-// know when a step doesn't need to be re-run).
+fn addMupdfStatic(exe: *std.Build.Step.Compile, b: *std.Build, prefix: []const u8) void {
+    exe.addIncludePath(.{ .cwd_relative = b.fmt("{s}/include", .{prefix}) });
+    exe.addLibraryPath(.{ .cwd_relative = b.fmt("{s}/lib", .{prefix}) });
+
+    exe.addObjectFile(.{ .cwd_relative = b.fmt("{s}/lib/libmupdf.a", .{prefix}) });
+    exe.addObjectFile(.{ .cwd_relative = b.fmt("{s}/lib/libmupdf-third.a", .{prefix}) });
+
+    exe.linkLibC();
+}
+
+fn addMupdfDynamic(exe: *std.Build.Step.Compile, target: std.Target) void {
+    if (target.os.tag == .macos and target.cpu.arch == .aarch64) {
+        exe.addIncludePath(.{ .cwd_relative = "/opt/homebrew/include" });
+        exe.addLibraryPath(.{ .cwd_relative = "/opt/homebrew/lib" });
+    } else if (target.os.tag == .macos and target.cpu.arch == .x86_64) {
+        exe.addIncludePath(.{ .cwd_relative = "/usr/local/include" });
+        exe.addLibraryPath(.{ .cwd_relative = "/usr/local/lib" });
+    } else if (target.os.tag == .linux) {
+        exe.addIncludePath(.{ .cwd_relative = "/home/linuxbrew/.linuxbrew/include" });
+        exe.addLibraryPath(.{ .cwd_relative = "/home/linuxbrew/.linuxbrew/lib" });
+
+        const linux_libs = [_][]const u8{
+            "mupdf-third", "harfbuzz",
+            "freetype",    "jbig2dec",
+            "jpeg",        "openjp2",
+            "gumbo",       "mujs",
+        };
+        for (linux_libs) |lib| exe.linkSystemLibrary(lib);
+    }
+    exe.linkSystemLibrary("mupdf");
+    exe.linkSystemLibrary("z");
+    exe.linkLibC();
+}
+
 pub fn build(b: *std.Build) void {
-    // Standard target options allow the person running `zig build` to choose
-    // what target to build for. Here we do not override the defaults, which
-    // means any target is allowed, and the default is native. Other options
-    // for restricting supported target set are available.
     const target = b.standardTargetOptions(.{});
-    // Standard optimization options allow the person running `zig build` to select
-    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
-    // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
-    // It's also possible to define more custom flags to toggle optional features
-    // of this build script using `b.option()`. All defined flags (including
-    // target and optimize options) will be listed when running `zig build --help`
-    // in this directory.
 
-    // This creates a module, which represents a collection of source files alongside
-    // some compilation options, such as optimization mode and linked system libraries.
-    // Zig modules are the preferred way of making Zig code available to consumers.
-    // addModule defines a module that we intend to make available for importing
-    // to our consumers. We must give it a name because a Zig package can expose
-    // multiple modules and consumers will need to be able to specify which
-    // module they want to access.
-    const mod = b.addModule("portadoc", .{
-        // The root source file is the "entry point" of this module. Users of
-        // this module will only be able to access public declarations contained
-        // in this file, which means that if you have declarations that you
-        // intend to expose to consumers that were defined in other files part
-        // of this module, you will have to make sure to re-export them from
-        // the root file.
-        .root_source_file = b.path("src/root.zig"),
-        // Later on we'll use this module as the root module of a test executable
-        // which requires us to specify a target.
-        .target = target,
-    });
+    var useVendorMupdf = true;
+    const prefix = "./local";
+    const location = "./deps/mupdf/local";
 
-    // Here we define an executable. An executable needs to have a root module
-    // which needs to expose a `main` function. While we could add a main function
-    // to the module defined above, it's sometimes preferable to split business
-    // logic and the CLI into two separate modules.
-    //
-    // If your goal is to create a Zig library for others to use, consider if
-    // it might benefit from also exposing a CLI tool. A parser library for a
-    // data serialization format could also bundle a CLI syntax checker, for example.
-    //
-    // If instead your goal is to create an executable, consider if users might
-    // be interested in also being able to embed the core functionality of your
-    // program in their own executable in order to avoid the overhead involved in
-    // subprocessing your CLI tool.
-    //
-    // If neither case applies to you, feel free to delete the declaration you
-    // don't need and to put everything under a single module.
-    const exe = b.addExecutable(.{
-        .name = "portadoc",
-        .root_module = b.createModule(.{
-            // b.createModule defines a new module just like b.addModule but,
-            // unlike b.addModule, it does not expose the module to consumers of
-            // this package, which is why in this case we don't have to give it a name.
-            .root_source_file = b.path("src/main.zig"),
-            // Target and optimization levels must be explicitly wired in when
-            // defining an executable or library (in the root module), and you
-            // can also hardcode a specific target for an executable or library
-            // definition if desireable (e.g. firmware for embedded devices).
-            .target = target,
-            .optimize = optimize,
-            // List of modules available for import in source files part of the
-            // root module.
-            .imports = &.{
-                // Here "portadoc" is the name you will use in your source code to
-                // import this module (e.g. `@import("portadoc")`). The name is
-                // repeated because you are allowed to rename your imports, which
-                // can be extremely useful in case of collisions (which can happen
-                // importing modules from different packages).
-                .{ .name = "portadoc", .module = mod },
-            },
-        }),
-    });
+    std.fs.cwd().access("./deps/mupdf/Makefile", .{}) catch |err| {
+        if (err == error.FileNotFound) {
+            useVendorMupdf = false;
+        } else {
+            std.debug.print("Error: {s}\n", .{@errorName(err)});
+            return;
+        }
+    };
+    const allocator = std.heap.page_allocator;
+    var make_args: std.ArrayList([]const u8) = .empty;
+    defer make_args.deinit(allocator);
 
-    // This declares intent for the executable to be installed into the
-    // install prefix when running `zig build` (i.e. when executing the default
-    // step). By default the install prefix is `zig-out/` but can be overridden
-    // by passing `--prefix` or `-p`.
-    b.installArtifact(exe);
+    make_args.append(allocator, "make") catch unreachable;
 
-    // This creates a top level step. Top level steps have a name and can be
-    // invoked by name when running `zig build` (e.g. `zig build run`).
-    // This will evaluate the `run` step rather than the default step.
-    // For a top level step to actually do something, it must depend on other
-    // steps (e.g. a Run step, as we will see in a moment).
-    const run_step = b.step("run", "Run the app");
+    // use as many cores as possible by default (like zig) I dont know how to check for j<N> arg
+    const cpu_count = std.Thread.getCpuCount() catch 1;
+    make_args.append(allocator, b.fmt("-j{d}", .{cpu_count})) catch unreachable;
 
-    // This creates a RunArtifact step in the build graph. A RunArtifact step
-    // invokes an executable compiled by Zig. Steps will only be executed by the
-    // runner if invoked directly by the user (in the case of top level steps)
-    // or if another step depends on it, so it's up to you to define when and
-    // how this Run step will be executed. In our case we want to run it when
-    // the user runs `zig build run`, so we create a dependency link.
-    const run_cmd = b.addRunArtifact(exe);
-    run_step.dependOn(&run_cmd.step);
+    make_args.append(allocator, "-C") catch unreachable;
+    make_args.append(allocator, "deps/mupdf") catch unreachable;
 
-    // By making the run step depend on the default step, it will be run from the
-    // installation directory rather than directly from within the cache directory.
-    run_cmd.step.dependOn(b.getInstallStep());
-
-    // This allows the user to pass arguments to the application in the build
-    // command itself, like this: `zig build run -- arg1 arg2 etc`
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
+    if (target.result.os.tag == .linux) {
+        make_args.append(allocator, "HAVE_X11=no") catch unreachable;
+        make_args.append(allocator, "HAVE_GLUT=no") catch unreachable;
     }
 
-    // Creates an executable that will run `test` blocks from the provided module.
-    // Here `mod` needs to define a target, which is why earlier we made sure to
-    // set the releative field.
-    const mod_tests = b.addTest(.{
-        .root_module = mod,
+    make_args.append(allocator, "XCFLAGS=-w -DTOFU -DTOFU_CJK -DFZ_ENABLE_PDF=1 " ++
+        "-DFZ_ENABLE_XPS=0 -DFZ_ENABLE_SVG=0 -DFZ_ENABLE_CBZ=0 " ++
+        "-DFZ_ENABLE_IMG=0 -DFZ_ENABLE_HTML=0 -DFZ_ENABLE_EPUB=0") catch unreachable;
+    make_args.append(allocator, "tools=no") catch unreachable;
+    make_args.append(allocator, "apps=no") catch unreachable;
+
+    const prefix_arg = b.fmt("prefix={s}", .{prefix});
+    make_args.append(allocator, prefix_arg) catch unreachable;
+    make_args.append(allocator, "install") catch unreachable;
+
+    const mupdf_build_step = b.addSystemCommand(make_args.items);
+
+    const exe = b.addExecutable(.{
+        .name = "fancy-cat",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
+    exe.headerpad_max_install_names = true;
 
-    // A run step that will run the test executable.
-    const run_mod_tests = b.addRunArtifact(mod_tests);
+    if (target.result.os.tag == .macos) exe.linkFramework("CoreGraphics");
 
-    // Creates an executable that will run `test` blocks from the executable's
-    // root module. Note that test executables only test one module at a time,
-    // hence why we have to create two separate ones.
-    const exe_tests = b.addTest(.{
-        .root_module = exe.root_module,
-    });
+    const deps = .{
+        .vaxis = b.dependency("vaxis", .{ .target = target, .optimize = optimize }),
+        .fzwatch = b.dependency("fzwatch", .{ .target = target, .optimize = optimize }),
+        .fastb64z = b.dependency("fastb64z", .{ .target = target, .optimize = optimize }),
+    };
 
-    // A run step that will run the second test executable.
-    const run_exe_tests = b.addRunArtifact(exe_tests);
+    exe.root_module.addImport("fastb64z", deps.fastb64z.module("fastb64z"));
+    exe.root_module.addImport("vaxis", deps.vaxis.module("vaxis"));
+    exe.root_module.addImport("fzwatch", deps.fzwatch.module("fzwatch"));
 
-    // A top level step for running all tests. dependOn can be called multiple
-    // times and since the two run steps do not depend on one another, this will
-    // make the two of them run in parallel.
-    const test_step = b.step("test", "Run tests");
-    test_step.dependOn(&run_mod_tests.step);
-    test_step.dependOn(&run_exe_tests.step);
+    exe.root_module.addAnonymousImport("metadata", .{ .root_source_file = b.path("build.zig.zon") });
 
-    // Just like flags, top level steps are also listed in the `--help` menu.
-    //
-    // The Zig build system is entirely implemented in userland, which means
-    // that it cannot hook into private compiler APIs. All compilation work
-    // orchestrated by the build system will result in other Zig compiler
-    // subcommands being invoked with the right flags defined. You can observe
-    // these invocations when one fails (or you pass a flag to increase
-    // verbosity) to validate assumptions and diagnose problems.
-    //
-    // Lastly, the Zig build system is relatively simple and self-contained,
-    // and reading its source code will allow you to master it.
+    if (useVendorMupdf) {
+        exe.step.dependOn(&mupdf_build_step.step);
+        addMupdfStatic(exe, b, location);
+        b.installArtifact(exe);
+        b.getInstallStep().dependOn(&mupdf_build_step.step);
+    } else {
+        addMupdfDynamic(exe, target.result);
+        b.installArtifact(exe);
+    }
+
+    exe.addIncludePath(.{ .cwd_relative = "src/mupdf-z" });
+    exe.addCSourceFile(.{ .file = .{ .cwd_relative = "src/mupdf-z/fitz-z.c" } });
+
+    const run_cmd = b.addRunArtifact(exe);
+    if (b.args) |args| run_cmd.addArgs(args);
+    b.step("run", "Run the app").dependOn(&run_cmd.step);
 }
