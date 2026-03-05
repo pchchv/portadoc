@@ -3,6 +3,7 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const prefix = "./local";
     const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
     var useVendorMupdf = true;
     std.fs.cwd().access("./deps/mupdf/Makefile", .{}) catch |err| {
         if (err == error.FileNotFound) {
@@ -37,4 +38,21 @@ pub fn build(b: *std.Build) void {
     const prefix_arg = b.fmt("prefix={s}", .{prefix});
     make_args.append(allocator, prefix_arg) catch unreachable;
     make_args.append(allocator, "install") catch unreachable;
+
+    const exe = b.addExecutable(.{
+        .name = "fancy-cat",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    exe.headerpad_max_install_names = true;
+    if (target.result.os.tag == .macos) {
+        exe.linkFramework("CoreGraphics");
+    }
+
+    exe.root_module.addAnonymousImport("metadata", .{ .root_source_file = b.path("build.zig.zon") });
+    exe.addIncludePath(.{ .cwd_relative = "src/mupdf-z" });
+    exe.addCSourceFile(.{ .file = .{ .cwd_relative = "src/mupdf-z/fitz-z.c" } });
 }
