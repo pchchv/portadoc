@@ -1,5 +1,13 @@
 const std = @import("std");
 
+fn addMupdfStatic(exe: *std.Build.Step.Compile, b: *std.Build, prefix: []const u8) void {
+    exe.addIncludePath(.{ .cwd_relative = b.fmt("{s}/include", .{prefix}) });
+    exe.addLibraryPath(.{ .cwd_relative = b.fmt("{s}/lib", .{prefix}) });
+    exe.addObjectFile(.{ .cwd_relative = b.fmt("{s}/lib/libmupdf.a", .{prefix}) });
+    exe.addObjectFile(.{ .cwd_relative = b.fmt("{s}/lib/libmupdf-third.a", .{prefix}) });
+    exe.linkLibC();
+}
+
 pub fn build(b: *std.Build) void {
     const prefix = "./local";
     const target = b.standardTargetOptions(.{});
