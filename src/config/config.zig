@@ -222,3 +222,56 @@ fn parseRGB(val: std.json.Value, allocator: std.mem.Allocator) ?[3]u8 {
         else => return null,
     }
 }
+
+fn parseStyle(obj: std.json.ObjectMap, allocator: std.mem.Allocator, fallback: vaxis.Cell.Style) vaxis.Cell.Style {
+    const val = obj.get("style") orelse return fallback;
+    if (val != .object) return fallback;
+
+    var style = fallback;
+    inline for (std.meta.fields(vaxis.Cell.Style)) |field| {
+        if (val.object.get(field.name)) |field_val| {
+            if (comptime std.mem.eql(u8, field.name, "fg") or std.mem.eql(u8, field.name, "bg") or std.mem.eql(u8, field.name, "ul")) {
+                if (parseRGB(field_val, allocator)) |rgb| {
+                    @field(style, field.name) = .{ .rgb = rgb };
+                } else {
+                    @field(style, field.name) = std.json.innerParseFromValue(field.type, allocator, field_val, .{}) catch @field(style, field.name);
+                }
+            } else {
+                @field(style, field.name) = std.json.innerParseFromValue(field.type, allocator, field_val, .{}) catch @field(style, field.name);
+            }
+        }
+    }
+
+    return style;
+}
+
+fn applyStyle(item: StatusBar.Item, style: vaxis.Cell.Style, allocator: std.mem.Allocator) StatusBar.Item {
+    var styled_item: StatusBar.Item = .{ .styled = StatusBar.StyledItem{ .text = "", .style = style } };
+    var mode_aware_item: StatusBar.Item = .{ .mode_aware = StatusBar.ModeAwareItem{
+        .view = StatusBar.StyledItem{ .text = "", .style = style },
+        .command = StatusBar.StyledItem{ .text = "", .style = style },
+    } };
+    var reload_aware_item: StatusBar.Item = .{ .reload_aware = StatusBar.ReloadAwareItem{
+        .idle = StatusBar.StyledItem{ .text = "", .style = style },
+        .reload = StatusBar.StyledItem{ .text = "", .style = style },
+        .watching = StatusBar.StyledItem{ .text = "", .style = style },
+    } };
+
+    switch (item) {
+        .styled => |styled| {
+            styled_item.styled.text = allocator.dupe(u8, styled.text) catch styled_item.styled.text;
+            return styled_item;
+        },
+        .mode_aware => |mode_aware| {
+            mode_aware_item.mode_aware.view.text = allocator.dupe(u8, mode_aware.view.text) catch mode_aware_item.mode_aware.view.text;
+            mode_aware_item.mode_aware.command.text = allocator.dupe(u8, mode_aware.command.text) catch mode_aware_item.mode_aware.command.text;
+            return mode_aware_item;
+        },
+        .reload_aware => |reload_aware| {
+            reload_aware_item.reload_aware.idle.text = allocator.dupe(u8, reload_aware.idle.text) catch reload_aware_item.reload_aware.idle.text;
+            reload_aware_item.reload_aware.reload.text = allocator.dupe(u8, reload_aware.reload.text) catch reload_aware_item.reload_aware.reload.text;
+            reload_aware_item.reload_aware.watching.text = allocator.dupe(u8, reload_aware.watching.text) catch reload_aware_item.reload_aware.watching.text;
+            return reload_aware_item;
+        },
+    }
+}
