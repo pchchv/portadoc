@@ -126,6 +126,22 @@ pub const General = struct {
     }
 };
 
+pub const Cache = struct {
+    enabled: bool = true,
+    // number of pages to cache
+    lru_size: u16 = 10,
+
+    pub fn parse(val: std.json.Value, allocator: std.mem.Allocator) Cache {
+        var cache = Cache{};
+        if (val != .object) return cache;
+
+        cache.enabled = parseType(bool, val.object, "enabled", allocator, cache.enabled);
+        // XXX temporary change to u16 from usize due to bug in std
+        cache.lru_size = parseType(u16, val.object, "lru_size", allocator, cache.lru_size);
+        return cache;
+    }
+};
+
 fn parseType(comptime T: type, obj: std.json.ObjectMap, key: []const u8, allocator: std.mem.Allocator, fallback: T) T {
     if (obj.get(key)) |raw_key| {
         return std.json.innerParseFromValue(T, allocator, raw_key, .{}) catch fallback;
