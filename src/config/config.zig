@@ -106,3 +106,27 @@ fn parseKeyBinding(obj: std.json.ObjectMap, name: []const u8, allocator: std.mem
     binding.mods = mods;
     return binding;
 }
+
+fn parseRGB(val: std.json.Value, allocator: std.mem.Allocator) ?[3]u8 {
+    switch (val) {
+        .string => |str| {
+            var hex = str;
+            if (hex.len == 0) return null;
+            if (std.mem.startsWith(u8, hex, "#")) hex = hex[1..];
+            if (std.mem.startsWith(u8, hex, "0x") or std.mem.startsWith(u8, hex, "0X")) hex = hex[2..];
+            if (hex.len != 6) return null;
+
+            const rgb_int = std.fmt.parseInt(u32, hex, 16) catch return null;
+            const r = @as(u8, @intCast((rgb_int >> 16) & 0xFF));
+            const g = @as(u8, @intCast((rgb_int >> 8) & 0xFF));
+            const b = @as(u8, @intCast(rgb_int & 0xFF));
+            return .{ r, g, b };
+        },
+        .object => |obj| {
+            const rgb_val = obj.get("rgb") orelse return null;
+            const rgb = std.json.innerParseFromValue([3]u8, allocator, rgb_val, .{}) catch return null;
+            return rgb;
+        },
+        else => return null,
+    }
+}
