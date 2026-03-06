@@ -134,4 +134,44 @@ pub const Context = struct {
             self.current_mode.command.drawCommandBar(win);
         }
     }
+
+    pub fn drawCurrentPage(self: *Self, win: vaxis.Window) !void {
+        if (self.reload_page) {
+            const winsize = try vaxis.Tty.getWinsize(self.tty.fd);
+            const pix_per_col = try std.math.divCeil(u16, win.screen.width_pix, win.screen.width);
+            const pix_per_row = try std.math.divCeil(u16, win.screen.height_pix, win.screen.height);
+            const x_pix = winsize.cols * pix_per_col;
+            var y_pix = winsize.rows * pix_per_row;
+            if (self.config.status_bar.enabled) {
+                y_pix -|= 2 * pix_per_row;
+            } else {
+                y_pix -|= 1 * pix_per_row;
+            }
+
+            self.current_page = try self.getPage(
+                self.document_handler.getCurrentPageNumber(),
+                x_pix,
+                y_pix,
+            );
+
+            self.reload_page = false;
+        }
+
+        if (self.current_page) |img| {
+            const dims = try img.cellSize(win);
+            const x_off = (win.width - dims.cols) / 2;
+            var y_off = (win.height - dims.rows) / 2;
+            if (self.config.status_bar.enabled) {
+                y_off -|= 1; // room for status bar
+            }
+
+            const center = win.child(.{
+                .x_off = x_off,
+                .y_off = y_off,
+                .width = dims.cols,
+                .height = dims.rows,
+            });
+            try img.draw(center, .{ .scale = .contain });
+        }
+    }
 };
