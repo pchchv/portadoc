@@ -202,4 +202,115 @@ pub const Context = struct {
             last_index = close + 1;
         }
     }
+
+    pub fn drawStatusBar(self: *Self, win: vaxis.Window) !void {
+        const arena = self.arena.allocator();
+        defer _ = self.arena.reset(.retain_capacity);
+
+        const status_bar = win.child(.{
+            .x_off = 0,
+            .y_off = win.height -| 2,
+            .width = win.width,
+            .height = 1,
+        });
+
+        // expand all items into styled sub-items
+        var expanded_items = std.array_list.Managed(Config.StatusBar.StyledItem).init(arena);
+        defer expanded_items.deinit();
+
+        for (self.config.status_bar.items) |item| {
+            switch (item) {
+                .styled => |styled| {
+                    try expandPlaceholders(&expanded_items, styled);
+                },
+                .mode_aware => |mode_aware| {
+                    switch (self.current_mode) {
+                        .view => try expandPlaceholders(&expanded_items, mode_aware.view),
+                        .command => try expandPlaceholders(&expanded_items, mode_aware.command),
+                    }
+                },
+                .reload_aware => |reload_aware| {
+                    switch (self.current_reload_indicator_state) {
+                        .idle => try expandPlaceholders(&expanded_items, reload_aware.idle),
+                        .reload => try expandPlaceholders(&expanded_items, reload_aware.reload),
+                        .watching => try expandPlaceholders(&expanded_items, reload_aware.watching),
+                    }
+                },
+            }
+        }
+
+        const items = expanded_items.items;
+        // find the separator
+        var separator_index: usize = items.len;
+        for (items, 0..) |item, i| {
+            if (std.mem.eql(u8, item.text, Config.StatusBar.SEPARATOR)) {
+                separator_index = i;
+                break;
+            }
+        }
+
+        if (separator_index < items.len) {
+            status_bar.fill(vaxis.Cell{ .style = items[separator_index].style });
+        } else {
+            status_bar.fill(vaxis.Cell{ .style = self.config.status_bar.style });
+        }
+
+        // left side
+        var left_col: usize = 0;
+        for (0..separator_index) |i| {
+            try self.drawStatusText(status_bar, items[i], &left_col, true, arena);
+        }
+
+        // right side
+        if (separator_index < items.len - 1) {
+            var right_col: usize = win.width;
+            for (0..(items.len - separator_index - 1)) |j| {
+                try self.drawStatusText(status_bar, items[items.len - 1 - j], &right_col, false, arena);
+            }
+        }
+    }
+
+    fn drawStatusText(self: *Self, status_bar: vaxis.Window, item: Config.StatusBar.StyledItem, col_offset: *usize, left_aligned: bool, allocator: std.mem.Allocator) !void {
+        var text = item.text;
+        if (std.mem.eql(u8, text, Config.StatusBar.PATH)) {
+            const cwd = try std.fs.cwd().realpathAlloc(allocator, ".");
+            defer allocator.free(cwd);
+
+            const full_path = try std.fs.cwd().realpathAlloc(allocator, self.document_handler.getPath());
+            defer allocator.free(full_path);
+
+            if (std.mem.startsWith(u8, full_path, cwd)) {
+                var path = full_path[cwd.len..];
+                if (path.len > 0 and path[0] == '/') path = path[1..];
+                text = try std.fmt.allocPrint(allocator, "{s}", .{path}); // trim cwd
+            } else if (std.posix.getenv("HOME")) |home| {
+                if (std.mem.startsWith(u8, full_path, home)) {
+                    var path = full_path[home.len..];
+                    if (path.len > 0 and path[0] == '/') path = path[1..];
+                    text = try std.fmt.allocPrint(allocator, "~/{s}", .{path});
+                } else {
+                    text = try std.fmt.allocPrint(allocator, "{s}", .{full_path});
+                }
+            } else {
+                text = try std.fmt.allocPrint(allocator, "{s}", .{full_path});
+            }
+        } else if (std.mem.eql(u8, text, Config.StatusBar.PAGE)) {
+            text = try std.fmt.allocPrint(allocator, "{}", .{self.document_handler.getCurrentPageNumber() + 1});
+        } else if (std.mem.eql(u8, text, Config.StatusBar.TOTAL_PAGES)) {
+            text = try std.fmt.allocPrint(allocator, "{}", .{self.document_handler.getTotalPages()});
+        } else if (std.mem.eql(u8, text, Config.StatusBar.SEPARATOR)) {
+            text = "";
+        }
+
+        const width = vaxis.gwidth.gwidth(text, .wcwidth);
+
+        if (!left_aligned) col_offset.* -= width;
+
+        _ = status_bar.print(
+            &.{.{ .text = text, .style = item.style }},
+            .{ .col_offset = @intCast(col_offset.*) },
+        );
+
+        if (left_aligned) col_offset.* += width;
+    }
 };
