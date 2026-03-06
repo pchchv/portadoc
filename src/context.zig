@@ -103,6 +103,10 @@ pub const Context = struct {
         self.reload_page = true;
     }
 
+    pub fn toggleFullScreen(self: *Self) void {
+        self.config.status_bar.enabled = !self.config.status_bar.enabled;
+    }
+
     pub fn handleKeyStroke(self: *Self, key: vaxis.Key) !void {
         const km = self.config.key_map;
         // global keybindings
@@ -115,5 +119,19 @@ pub const Context = struct {
             .view => |*state| state.handleKeyStroke(key, km),
             .command => |*state| state.handleKeyStroke(key, km),
         };
+    }
+
+    pub fn draw(self: *Self) !void {
+        const win = self.vx.window();
+        win.clear();
+
+        try self.drawCurrentPage(win);
+        if (self.config.status_bar.enabled) {
+            try self.drawStatusBar(win);
+        }
+
+        if (self.current_mode == .command) {
+            self.current_mode.command.drawCommandBar(win);
+        }
     }
 };
