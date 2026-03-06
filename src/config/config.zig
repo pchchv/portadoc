@@ -71,6 +71,61 @@ pub const FileMonitor = struct {
     }
 };
 
+pub const General = struct {
+    colorize: bool = false,
+    white: i32 = 0x000000,
+    black: i32 = 0xffffff,
+    // size of the pdf
+    // 1 is the whole window
+    size: f32 = 1.0,
+    // percentage
+    zoom_step: f32 = 1.25,
+    zoom_min: f32 = 1.0,
+    // pixels
+    scroll_step: f32 = 100.0,
+    // seconds
+    retry_delay: f32 = 0.2,
+    timeout: f32 = 5.0,
+    // resolution
+    detect_dpi: bool = true,
+    dpi: f32 = 96.0,
+    // whole number (possibly 0)
+    history: u32 = 1000,
+
+    pub fn parse(val: std.json.Value, allocator: std.mem.Allocator) General {
+        var general = General{};
+        if (val != .object) return general;
+
+        general.colorize = parseType(bool, val.object, "colorize", allocator, general.colorize);
+        if (val.object.get("white")) |white| {
+            if (parseRGB(white, allocator)) |rgb| {
+                general.white = @intCast(
+                    (@as(u32, rgb[0]) << 16) | (@as(u32, rgb[1]) << 8) | @as(u32, rgb[2]),
+                );
+            }
+        }
+
+        if (val.object.get("black")) |black| {
+            if (parseRGB(black, allocator)) |rgb| {
+                general.black = @intCast(
+                    (@as(u32, rgb[0]) << 16) | (@as(u32, rgb[1]) << 8) | @as(u32, rgb[2]),
+                );
+            }
+        }
+
+        general.size = parseType(f32, val.object, "size", allocator, general.size);
+        general.zoom_step = parseType(f32, val.object, "zoom_step", allocator, general.zoom_step);
+        general.zoom_min = parseType(f32, val.object, "zoom_min", allocator, general.zoom_min);
+        general.scroll_step = parseType(f32, val.object, "scroll_step", allocator, general.scroll_step);
+        general.retry_delay = parseType(f32, val.object, "retry_delay", allocator, general.retry_delay);
+        general.timeout = parseType(f32, val.object, "timeout", allocator, general.timeout);
+        general.detect_dpi = parseType(bool, val.object, "detect_dpi", allocator, general.detect_dpi);
+        general.dpi = parseType(f32, val.object, "dpi", allocator, general.dpi);
+        general.history = parseType(u32, val.object, "history", allocator, general.history);
+        return general;
+    }
+};
+
 fn parseType(comptime T: type, obj: std.json.ObjectMap, key: []const u8, allocator: std.mem.Allocator, fallback: T) T {
     if (obj.get(key)) |raw_key| {
         return std.json.innerParseFromValue(T, allocator, raw_key, .{}) catch fallback;
