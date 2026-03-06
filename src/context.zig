@@ -3,6 +3,13 @@ const vaxis = @import("vaxis");
 const fzwatch = @import("fzwatch");
 
 pub const ReloadIndicatorState = enum { idle, reload, watching };
+pub const Event = union(enum) {
+    key_press: vaxis.Key,
+    mouse: vaxis.Mouse,
+    winsize: vaxis.Winsize,
+    file_changed,
+    reload_done: usize,
+};
 
 pub const Context = struct {
     const Self = @This();
@@ -51,5 +58,18 @@ pub const Context = struct {
         self.allocator.destroy(self.config);
         self.arena.deinit();
         self.allocator.free(self.buf);
+    }
+
+    fn callback(context: ?*anyopaque, event: fzwatch.Event) void {
+        switch (event) {
+            .modified => {
+                const loop = @as(*vaxis.Loop(Event), @ptrCast(@alignCast(context.?)));
+                loop.postEvent(Event.file_changed);
+            },
+        }
+    }
+
+    fn watcherWorker(self: *Self, watcher: *fzwatch.Watcher) !void {
+        try watcher.start(.{ .latency = self.config.file_monitor.latency });
     }
 };
