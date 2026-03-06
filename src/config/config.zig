@@ -223,6 +223,89 @@ fn parseRGB(val: std.json.Value, allocator: std.mem.Allocator) ?[3]u8 {
     }
 }
 
+fn parseStyledItem(val: ?std.json.Value, allocator: std.mem.Allocator, fallback: StatusBar.StyledItem) StatusBar.StyledItem {
+    const item = val orelse return fallback;
+    var styled_item = fallback;
+    switch (item) {
+        .string => |str| {
+            styled_item.text = allocator.dupe(u8, str) catch fallback.text;
+            return styled_item;
+        },
+        .object => |obj| {
+            if (obj.get("text")) |raw_text| {
+                const text = std.json.innerParseFromValue([]const u8, allocator, raw_text, .{}) catch return styled_item;
+                styled_item.text = allocator.dupe(u8, text) catch fallback.text;
+            } else {
+                styled_item.text = fallback.text;
+            }
+            if (obj.get("style")) |raw_style| {
+                if (raw_style == .object)
+                    styled_item.style = parseStyle(obj, allocator, fallback.style);
+            }
+
+            return styled_item;
+        },
+        else => return styled_item,
+    }
+}
+
+fn parseItem(val: std.json.Value, allocator: std.mem.Allocator, fallback_style: vaxis.Cell.Style) StatusBar.Item {
+    var styled_item: StatusBar.Item = .{ .styled = StatusBar.StyledItem{ .text = "", .style = fallback_style } };
+    var mode_aware_item: StatusBar.Item = .{ .mode_aware = StatusBar.ModeAwareItem{
+        .view = StatusBar.StyledItem{ .text = "", .style = fallback_style },
+        .command = StatusBar.StyledItem{ .text = "", .style = fallback_style },
+    } };
+    var reload_aware_item: StatusBar.Item = .{ .reload_aware = StatusBar.ReloadAwareItem{
+        .idle = StatusBar.StyledItem{ .text = "", .style = fallback_style },
+        .reload = StatusBar.StyledItem{ .text = "", .style = fallback_style },
+        .watching = StatusBar.StyledItem{ .text = "", .style = fallback_style },
+    } };
+
+    switch (val) {
+        .string => |str| {
+            styled_item.styled.text = allocator.dupe(u8, str) catch "";
+            return styled_item;
+        },
+
+        .object => |obj| {
+            if (obj.contains("view") or obj.contains("command")) {
+                mode_aware_item.mode_aware.view = parseStyledItem(obj.get("view"), allocator, mode_aware_item.mode_aware.view);
+                mode_aware_item.mode_aware.command = parseStyledItem(obj.get("command"), allocator, mode_aware_item.mode_aware.command);
+                return mode_aware_item;
+            }
+            if (obj.contains("idle") or obj.contains("reload") or obj.contains("watching")) {
+                reload_aware_item.reload_aware.idle = parseStyledItem(obj.get("idle"), allocator, reload_aware_item.reload_aware.idle);
+                reload_aware_item.reload_aware.reload = parseStyledItem(obj.get("reload"), allocator, reload_aware_item.reload_aware.reload);
+                reload_aware_item.reload_aware.watching = parseStyledItem(obj.get("watching"), allocator, reload_aware_item.reload_aware.watching);
+                return reload_aware_item;
+            }
+
+            styled_item.styled = parseStyledItem(val, allocator, styled_item.styled);
+            return styled_item;
+        },
+
+        else => return styled_item,
+    }
+}
+
+fn parseItems(obj: std.json.ObjectMap, allocator: std.mem.Allocator, fallback_style: vaxis.Cell.Style) []const StatusBar.Item {
+    const raw_items = obj.get("items") orelse {
+        const items = allocator.alloc(StatusBar.Item, StatusBar.default_items.len) catch return StatusBar.default_items;
+        for (StatusBar.default_items, 0..) |item, i| {
+            items[i] = applyStyle(item, fallback_style, allocator);
+        }
+        return items;
+    };
+
+    if (raw_items != .array) return StatusBar.default_items;
+    const items = allocator.alloc(StatusBar.Item, raw_items.array.items.len) catch return StatusBar.default_items;
+    for (raw_items.array.items, 0..) |item, i| {
+        items[i] = parseItem(item, allocator, fallback_style);
+    }
+
+    return items;
+}
+
 fn parseStyle(obj: std.json.ObjectMap, allocator: std.mem.Allocator, fallback: vaxis.Cell.Style) vaxis.Cell.Style {
     const val = obj.get("style") orelse return fallback;
     if (val != .object) return fallback;
