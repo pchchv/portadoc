@@ -142,6 +142,27 @@ pub const Cache = struct {
     }
 };
 
+pub const StatusBar = struct {
+    pub const StyledItem = struct {
+        text: []const u8,
+        style: vaxis.Cell.Style,
+    };
+    pub const ModeAwareItem = struct {
+        view: StyledItem,
+        command: StyledItem,
+    };
+    pub const ReloadAwareItem = struct {
+        idle: StyledItem,
+        reload: StyledItem,
+        watching: StyledItem,
+    };
+    pub const Item = union(enum) {
+        styled: StyledItem,
+        mode_aware: ModeAwareItem,
+        reload_aware: ReloadAwareItem,
+    };
+};
+
 fn parseType(comptime T: type, obj: std.json.ObjectMap, key: []const u8, allocator: std.mem.Allocator, fallback: T) T {
     if (obj.get(key)) |raw_key| {
         return std.json.innerParseFromValue(T, allocator, raw_key, .{}) catch fallback;
