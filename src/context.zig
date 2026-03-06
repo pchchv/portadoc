@@ -97,4 +97,23 @@ pub const Context = struct {
     fn watcherWorker(self: *Self, watcher: *fzwatch.Watcher) !void {
         try watcher.start(.{ .latency = self.config.file_monitor.latency });
     }
+
+    pub fn resetCurrentPage(self: *Self) void {
+        self.should_check_cache = self.config.cache.enabled;
+        self.reload_page = true;
+    }
+
+    pub fn handleKeyStroke(self: *Self, key: vaxis.Key) !void {
+        const km = self.config.key_map;
+        // global keybindings
+        if (key.matches(km.quit.codepoint, km.quit.mods)) {
+            self.should_quit = true;
+            return;
+        }
+
+        try switch (self.current_mode) {
+            .view => |*state| state.handleKeyStroke(key, km),
+            .command => |*state| state.handleKeyStroke(key, km),
+        };
+    }
 };
