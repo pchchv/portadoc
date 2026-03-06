@@ -1,3 +1,4 @@
+const Self = @This();
 const std = @import("std");
 const vaxis = @import("vaxis");
 
@@ -206,6 +207,62 @@ pub const StatusBar = struct {
         return status_bar;
     }
 };
+
+arena: std.heap.ArenaAllocator,
+key_map: KeyMap = .{},
+file_monitor: FileMonitor = .{},
+general: General = .{},
+status_bar: StatusBar = .{},
+cache: Cache = .{},
+legacy_path: bool = false,
+
+pub fn init(allocator: std.mem.Allocator) Self {
+    var self = Self{ .arena = std.heap.ArenaAllocator.init(allocator) };
+    const arena_allocator = self.arena.allocator();
+    const home = std.process.getEnvVarOwned(allocator, "HOME") catch return self;
+    defer allocator.free(home);
+
+    var path: []u8 = "";
+    const xdg_config_home = std.process.getEnvVarOwned(allocator, "XDG_CONFIG_HOME") catch null;
+    if (xdg_config_home) |x| {
+        path = std.fmt.allocPrint(allocator, "{s}/fancy-cat/config.json", .{x}) catch return self;
+        allocator.free(x);
+    } else path = std.fmt.allocPrint(allocator, "{s}/.config/fancy-cat/config.json", .{home}) catch return self;
+    defer allocator.free(path);
+
+    var content = std.fs.cwd().readFileAlloc(allocator, path, 1024 * 1024) catch null;
+    if (content == null) {
+        const legacy_path = std.fmt.allocPrint(allocator, "{s}/.fancy-cat", .{home}) catch return self;
+        defer allocator.free(legacy_path);
+
+        content = std.fs.cwd().readFileAlloc(allocator, legacy_path, 1024 * 1024) catch null;
+        if (content == null) {
+            if (std.fs.path.dirname(path)) |dir| std.fs.cwd().makePath(dir) catch {};
+            const file = std.fs.createFileAbsolute(path, .{}) catch return self;
+            file.close();
+            return self;
+        }
+        self.legacy_path = true;
+    }
+    defer allocator.free(content.?);
+
+    if (content.?.len == 0) return self;
+
+    var parsed = std.json.parseFromSlice(std.json.Value, arena_allocator, content.?, .{}) catch return self;
+    defer parsed.deinit();
+
+    if (parsed.value.object.get("KeyMap")) |key_map| self.key_map = KeyMap.parse(key_map, arena_allocator);
+    if (parsed.value.object.get("FileMonitor")) |file_monitor| self.file_monitor = FileMonitor.parse(file_monitor, arena_allocator);
+    if (parsed.value.object.get("General")) |general| self.general = General.parse(general, arena_allocator);
+    if (parsed.value.object.get("StatusBar")) |status_bar| self.status_bar = StatusBar.parse(status_bar, arena_allocator);
+    if (parsed.value.object.get("Cache")) |cache| self.cache = Cache.parse(cache, arena_allocator);
+
+    return self;
+}
+
+pub fn deinit(self: *Self) void {
+    self.arena.deinit();
+}
 
 fn parseType(comptime T: type, obj: std.json.ObjectMap, key: []const u8, allocator: std.mem.Allocator, fallback: T) T {
     if (obj.get(key)) |raw_key| {
