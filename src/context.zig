@@ -2,6 +2,7 @@ const std = @import("std");
 const vaxis = @import("vaxis");
 const fzwatch = @import("fzwatch");
 
+pub const panic = vaxis.panic_handler;
 pub const ReloadIndicatorState = enum { idle, reload, watching };
 pub const Event = union(enum) {
     key_press: vaxis.Key,
@@ -58,6 +59,30 @@ pub const Context = struct {
         self.allocator.destroy(self.config);
         self.arena.deinit();
         self.allocator.free(self.buf);
+    }
+
+    pub fn update(self: *Self, event: Event) !void {
+        switch (event) {
+            .key_press => |key| try self.handleKeyStroke(key),
+            .mouse => |mouse| self.mouse = mouse,
+            .winsize => |ws| {
+                try self.vx.resize(self.allocator, self.tty.writer(), ws);
+                self.cache.clear();
+                self.reload_page = true;
+            },
+            .file_changed => {
+                try self.document_handler.reloadDocument();
+                self.cache.clear();
+                self.reload_page = true;
+                if (self.reload_indicator_active) {
+                    self.current_reload_indicator_state = .reload;
+                    self.reload_indicator_timer.notifyChange();
+                }
+            },
+            .reload_done => {
+                self.current_reload_indicator_state = .watching;
+            },
+        }
     }
 
     fn callback(context: ?*anyopaque, event: fzwatch.Event) void {
