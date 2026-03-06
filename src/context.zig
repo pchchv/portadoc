@@ -1,6 +1,7 @@
 const std = @import("std");
 const vaxis = @import("vaxis");
 const fzwatch = @import("fzwatch");
+const Config = @import("config/config.zig");
 
 pub const panic = vaxis.panic_handler;
 pub const ReloadIndicatorState = enum { idle, reload, watching };
@@ -30,6 +31,7 @@ pub const Context = struct {
     current_reload_indicator_state: ReloadIndicatorState,
     reload_indicator_active: bool,
     buf: []u8,
+    config: *Config,
 
     pub fn deinit(self: *Self) void {
         switch (self.current_mode) {
@@ -172,6 +174,32 @@ pub const Context = struct {
                 .height = dims.rows,
             });
             try img.draw(center, .{ .scale = .contain });
+        }
+    }
+
+    fn expandPlaceholders(list: *std.array_list.Managed(Config.StatusBar.StyledItem), styled_text: Config.StatusBar.StyledItem) !void {
+        const text = styled_text.text;
+        var last_index: usize = 0;
+        while (last_index < text.len) {
+            const open = std.mem.indexOfScalarPos(u8, text, last_index, '<') orelse {
+                if (last_index < text.len) {
+                    try list.append(.{ .text = text[last_index..], .style = styled_text.style });
+                }
+                break;
+            };
+
+            if (open > last_index) {
+                try list.append(.{ .text = text[last_index..open], .style = styled_text.style });
+            }
+
+            const close = std.mem.indexOfScalarPos(u8, text, open, '>') orelse {
+                try list.append(.{ .text = text[open..], .style = styled_text.style });
+                break;
+            };
+
+            try list.append(.{ .text = text[open .. close + 1], .style = styled_text.style });
+
+            last_index = close + 1;
         }
     }
 };
