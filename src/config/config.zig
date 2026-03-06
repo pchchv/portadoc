@@ -35,6 +35,42 @@ pub const KeyMap = struct {
     }
 };
 
+pub const FileMonitor = struct {
+    enabled: bool = true,
+    // amount of time in seconds to wait in between polling for file changes
+    latency: f16 = 0.1,
+    reload_indicator_duration: f16 = 1.0,
+
+    pub fn parse(val: std.json.Value, allocator: std.mem.Allocator) FileMonitor {
+        var file_monitor = FileMonitor{};
+        if (val != .object) return file_monitor;
+
+        file_monitor.enabled = parseType(
+            bool,
+            val.object,
+            "enabled",
+            allocator,
+            file_monitor.enabled,
+        );
+        file_monitor.latency = parseType(
+            f16,
+            val.object,
+            "latency",
+            allocator,
+            file_monitor.latency,
+        );
+        file_monitor.reload_indicator_duration = parseType(
+            f16,
+            val.object,
+            "reload_indicator_duration",
+            allocator,
+            file_monitor.reload_indicator_duration,
+        );
+
+        return file_monitor;
+    }
+};
+
 fn parseType(comptime T: type, obj: std.json.ObjectMap, key: []const u8, allocator: std.mem.Allocator, fallback: T) T {
     if (obj.get(key)) |raw_key| {
         return std.json.innerParseFromValue(T, allocator, raw_key, .{}) catch fallback;
