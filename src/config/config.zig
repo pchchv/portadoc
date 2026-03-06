@@ -1,6 +1,40 @@
 const std = @import("std");
 const vaxis = @import("vaxis");
 
+pub const KeyMap = struct {
+    next: vaxis.Key = .{ .codepoint = 'n' },
+    prev: vaxis.Key = .{ .codepoint = 'p' },
+    scroll_up: vaxis.Key = .{ .codepoint = 'k' },
+    scroll_down: vaxis.Key = .{ .codepoint = 'j' },
+    scroll_left: vaxis.Key = .{ .codepoint = 'h' },
+    scroll_right: vaxis.Key = .{ .codepoint = 'l' },
+    zoom_in: vaxis.Key = .{ .codepoint = 'i' },
+    zoom_out: vaxis.Key = .{ .codepoint = 'o' },
+    width_mode: vaxis.Key = .{ .codepoint = 'w' },
+    colorize: vaxis.Key = .{ .codepoint = 'z' },
+    quit: vaxis.Key = .{ .codepoint = 'c', .mods = .{ .ctrl = true } },
+    full_screen: vaxis.Key = .{ .codepoint = 'f' },
+    enter_command_mode: vaxis.Key = .{ .codepoint = ':' },
+    exit_command_mode: vaxis.Key = .{ .codepoint = vaxis.Key.escape },
+    execute_command: vaxis.Key = .{ .codepoint = vaxis.Key.enter },
+    history_back: vaxis.Key = .{ .codepoint = vaxis.Key.up },
+    history_forward: vaxis.Key = .{ .codepoint = vaxis.Key.down },
+
+    pub fn parse(val: std.json.Value, allocator: std.mem.Allocator) KeyMap {
+        var keymap = KeyMap{};
+        if (val != .object) return keymap;
+
+        inline for (std.meta.fields(KeyMap)) |key| {
+            @field(keymap, key.name) = parseKeyBinding(val.object, key.name, allocator, @field(
+                keymap,
+                key.name,
+            ));
+        }
+
+        return keymap;
+    }
+};
+
 fn parseType(comptime T: type, obj: std.json.ObjectMap, key: []const u8, allocator: std.mem.Allocator, fallback: T) T {
     if (obj.get(key)) |raw_key| {
         return std.json.innerParseFromValue(T, allocator, raw_key, .{}) catch fallback;
