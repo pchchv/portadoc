@@ -161,6 +161,50 @@ pub const StatusBar = struct {
         mode_aware: ModeAwareItem,
         reload_aware: ReloadAwareItem,
     };
+
+    const default_style = vaxis.Cell.Style{
+        .bg = .{ .rgb = .{ 0, 0, 0 } },
+        .fg = .{ .rgb = .{ 255, 255, 255 } },
+    };
+
+    pub const PATH = "<path>";
+    pub const SEPARATOR = "<separator>";
+    pub const PAGE = "<page>";
+    pub const TOTAL_PAGES = "<total_pages>";
+    pub const default_items: []const StatusBar.Item = &.{
+        .{ .styled = .{ .text = " ", .style = default_style } },
+        .{ .mode_aware = .{
+            .view = .{ .text = "VIS", .style = default_style },
+            .command = .{ .text = "CMD", .style = default_style },
+        } },
+        .{ .styled = .{ .text = "   ", .style = default_style } },
+        .{ .styled = .{ .text = PATH, .style = default_style } },
+        .{ .styled = .{ .text = " ", .style = default_style } },
+        .{ .reload_aware = .{
+            .idle = .{ .text = " ", .style = default_style },
+            .reload = .{ .text = "*", .style = default_style },
+            .watching = .{ .text = " ", .style = default_style },
+        } },
+        .{ .styled = .{ .text = SEPARATOR, .style = default_style } },
+        .{ .styled = .{ .text = PAGE, .style = default_style } },
+        .{ .styled = .{ .text = ":", .style = default_style } },
+        .{ .styled = .{ .text = TOTAL_PAGES, .style = default_style } },
+        .{ .styled = .{ .text = " ", .style = default_style } },
+    };
+
+    enabled: bool = true,
+    style: vaxis.Cell.Style = default_style,
+    items: []const StatusBar.Item = default_items,
+
+    pub fn parse(val: std.json.Value, allocator: std.mem.Allocator) StatusBar {
+        var status_bar = StatusBar{};
+        if (val != .object) return status_bar;
+
+        status_bar.enabled = parseType(bool, val.object, "enabled", allocator, status_bar.enabled);
+        status_bar.style = parseStyle(val.object, allocator, status_bar.style);
+        status_bar.items = parseItems(val.object, allocator, status_bar.style);
+        return status_bar;
+    }
 };
 
 fn parseType(comptime T: type, obj: std.json.ObjectMap, key: []const u8, allocator: std.mem.Allocator, fallback: T) T {
