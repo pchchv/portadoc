@@ -9,3 +9,10 @@ pub const Key = struct {
     x_offset: i32,
     y_offset: i32,
 };
+
+const Node = struct {
+    key: Key,
+    value: CachedImage,
+    prev: ?*Node,
+    next: ?*Node,
+};
