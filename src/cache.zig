@@ -90,3 +90,42 @@ pub fn put(self: *Self, key: Key, image: CachedImage) !bool {
 
     return true;
 }
+
+pub fn remove(self: *Self, key: Key) bool {
+    const node = self.map.get(key) orelse return false;
+    _ = self.map.remove(key);
+
+    self.removeNode(node);
+    self.allocator.destroy(node);
+
+    return true;
+}
+
+fn removeNode(self: *Self, node: *Node) void {
+    if (node.prev) |prev| {
+        prev.next = node.next;
+    } else {
+        self.head = node.next;
+    }
+
+    if (node.next) |next| {
+        next.prev = node.prev;
+    } else {
+        self.tail = node.prev;
+    }
+}
+
+pub fn clear(self: *Self) void {
+    var current = self.head;
+    while (current) |node| {
+        const next = node.next;
+        // to avoid flicker,
+        // image is freed during put eviction
+        self.allocator.destroy(node);
+        current = next;
+    }
+
+    self.map.clearRetainingCapacity();
+    self.head = null;
+    self.tail = null;
+}
