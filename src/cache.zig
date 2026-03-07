@@ -59,3 +59,34 @@ pub fn deinit(self: *Self) void {
 
     self.map.deinit();
 }
+
+pub fn get(self: *Self, key: Key) ?CachedImage {
+    const node = self.map.get(key) orelse return null;
+    self.moveToFront(node);
+    return node.value;
+}
+
+pub fn put(self: *Self, key: Key, image: CachedImage) !bool {
+    if (self.map.get(key)) |node| {
+        self.moveToFront(node);
+        return false;
+    }
+
+    const new_node = try self.allocator.create(Node);
+    new_node.* = .{
+        .key = key,
+        .value = image,
+        .prev = null,
+        .next = null,
+    };
+
+    try self.map.put(key, new_node);
+    self.addToFront(new_node);
+
+    if (self.map.count() > self.lru_size) {
+        const tail_node = self.tail orelse unreachable;
+        _ = self.remove(tail_node.key);
+    }
+
+    return true;
+}
