@@ -129,3 +129,21 @@ pub fn clear(self: *Self) void {
     self.head = null;
     self.tail = null;
 }
+
+fn addToFront(self: *Self, node: *Node) void {
+    node.next = self.head;
+    node.prev = null;
+    if (self.head) |head| {
+        head.prev = node;
+    } else {
+        self.tail = node;
+    }
+
+    self.head = node;
+}
+
+fn moveToFront(self: *Self, node: *Node) void {
+    if (self.head == node) return;
+    self.removeNode(node);
+    self.addToFront(node);
+}
