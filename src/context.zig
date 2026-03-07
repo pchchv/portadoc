@@ -1,6 +1,7 @@
 const std = @import("std");
 const vaxis = @import("vaxis");
 const fzwatch = @import("fzwatch");
+const Cache = @import("./cache.zig");
 const Config = @import("config/config.zig");
 
 pub const panic = vaxis.panic_handler;
@@ -30,8 +31,9 @@ pub const Context = struct {
     should_check_cache: bool,
     current_reload_indicator_state: ReloadIndicatorState,
     reload_indicator_active: bool,
-    buf: []u8,
     config: *Config,
+    cache: Cache,
+    buf: []u8,
 
     pub fn deinit(self: *Self) void {
         switch (self.current_mode) {
