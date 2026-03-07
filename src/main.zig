@@ -1,4 +1,5 @@
 const std = @import("std");
+const Context = @import("context.zig").Context;
 
 const PackageName = enum { portadoc };
 
@@ -53,4 +54,10 @@ pub fn main() !void {
             std.log.err("memory leak", .{});
         }
     }
+
+    const allocator = gpa.allocator();
+    var app = try Context.init(allocator, args);
+    defer app.deinit();
+
+    try app.run();
 }
