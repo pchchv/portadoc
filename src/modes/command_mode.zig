@@ -1,4 +1,5 @@
 const Self = @This();
+const std = @import("std");
 const vaxis = @import("vaxis");
 const Context = @import("../context.zig").Context;
 
@@ -39,3 +40,35 @@ pub fn executeCommand(self: *Self, cmd: []const u8) void {
     if (self.handleZoom(cmd)) return;
     if (self.handleScroll(cmd)) return;
 }
+
+fn handleScroll(self: *Self, cmd: []const u8) bool {
+    if (cmd.len < 3) return false;
+    const axis = cmd[0];
+    const sign = cmd[1];
+    if ((axis != 'x' and axis != 'y') or (sign != '+' and sign != '-')) return false;
+
+    const number_str = cmd[2..];
+
+    if (std.fmt.parseFloat(f32, number_str)) |amount| {
+        const delta = if (sign == '+') amount else -amount;
+        const dx: f32 = if (axis == 'x') delta else 0.0;
+        const dy: f32 = if (axis == 'y') delta else 0.0;
+        self.context.document_handler.offsetScroll(dx, dy);
+        self.context.resetCurrentPage();
+        return true;
+    } else |_| {
+        return false;
+    }
+}
+
+fn handleZoom(self: *Self, cmd: []const u8) bool {
+    if (!std.mem.endsWith(u8, cmd, "%")) return false;
+
+    const number_str = cmd[0 .. cmd.len - 1];
+    if (std.fmt.parseFloat(f32, number_str)) |percent| {
+        self.context.document_handler.setZoom(percent);
+        self.context.resetCurrentPage();
+        return true;
+    } else |_| {
+        return false;
+    }
