@@ -72,3 +72,19 @@ fn handleZoom(self: *Self, cmd: []const u8) bool {
     } else |_| {
         return false;
     }
+}
+
+fn handleGoToPage(self: *Self, cmd: []const u8) bool {
+    const page_num = (std.fmt.parseInt(u16, cmd, 10) catch return false);
+    if (!self.context.document_handler.goToPage(page_num)) return false;
+
+    self.context.resetCurrentPage();
+    return true;
+}
+
+fn handleQuit(self: *Self, cmd: []const u8) bool {
+    if (!std.mem.eql(u8, cmd, "q")) return false;
+
+    self.context.should_quit = true;
+    return true;
+    }
