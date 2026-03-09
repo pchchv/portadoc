@@ -332,4 +332,44 @@ pub const Context = struct {
             .command => self.current_mode = .{ .command = CommandMode.init(self) },
         }
     }
+
+    pub fn getPage(self: *Self, page_number: u16, window_width: u32, window_height: u32) !vaxis.Image {
+        const cache_key = Cache.Key{
+            .colorize = self.config.general.colorize,
+            .page = page_number,
+            .width_mode = self.document_handler.getWidthMode(),
+            // scale zoom and position as integers with three digits of precision for use in key
+            .zoom = @as(u32, @intFromFloat(self.document_handler.getActiveZoom() * 1000.0)),
+            .x_offset = @as(i32, @intFromFloat(self.document_handler.getXOffset() * 1000.0)),
+            .y_offset = @as(i32, @intFromFloat(self.document_handler.getYOffset() * 1000.0)),
+        };
+
+        if (self.should_check_cache) {
+            if (self.cache.get(cache_key)) |cached| {
+                self.should_check_cache = false;
+                return cached.image;
+            }
+        }
+
+        const encoded_image = try self.document_handler.renderPage(
+            page_number,
+            window_width,
+            window_height,
+        );
+        defer self.allocator.free(encoded_image.base64);
+
+        const image = try self.vx.transmitPreEncodedImage(
+            self.tty.writer(),
+            encoded_image.base64,
+            encoded_image.width,
+            encoded_image.height,
+            .rgb,
+        );
+        if (self.should_check_cache) {
+            _ = try self.cache.put(cache_key, .{ .image = image });
+            self.should_check_cache = false;
+        }
+
+        return image;
+    }
 };
