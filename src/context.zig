@@ -372,4 +372,48 @@ pub const Context = struct {
 
         return image;
     }
+
+    pub fn run(self: *Self) !void {
+        self.current_mode = .{ .view = ViewMode.init(self) };
+        var loop: vaxis.Loop(Event) = .{
+            .tty = &self.tty,
+            .vaxis = &self.vx,
+        };
+
+        try loop.init();
+        try loop.start();
+        defer loop.stop();
+
+        try self.vx.enterAltScreen(self.tty.writer());
+        try self.vx.queryTerminal(self.tty.writer(), 1 * std.time.ns_per_s);
+        try self.vx.setMouseMode(self.tty.writer(), true);
+        if (self.config.file_monitor.enabled) {
+            if (self.watcher) |*w| {
+                w.setCallback(callback, &loop);
+                self.watcher_thread = try std.Thread.spawn(.{}, watcherWorker, .{ self, w });
+                self.current_reload_indicator_state = .watching;
+                if (self.config.status_bar.enabled and self.config.file_monitor.reload_indicator_duration > 0) {
+                    for (self.config.status_bar.items) |item| {
+                        if (item == .reload_aware) {
+                            try self.reload_indicator_timer.start(&loop);
+                            self.reload_indicator_active = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        while (!self.should_quit) {
+            loop.pollEvent();
+            while (loop.tryEvent()) |event| {
+                try self.update(event);
+            }
+
+            try self.draw();
+            var buffered = self.tty.writer();
+            try self.vx.render(buffered);
+            try buffered.flush();
+        }
+    }
 };
