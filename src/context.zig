@@ -1,11 +1,15 @@
-const std = @import("std");
 const vaxis = @import("vaxis");
+const std = @import("std");
 const fzwatch = @import("fzwatch");
 const Cache = @import("./cache.zig");
 const Config = @import("config/config.zig");
+const ViewMode = @import("modes/view_mode.zig");
+const CommandMode = @import("modes/command_mode.zig");
 
 pub const panic = vaxis.panic_handler;
+pub const ModeType = enum { view, command };
 pub const ReloadIndicatorState = enum { idle, reload, watching };
+pub const Mode = union(ModeType) { view: ViewMode, command: CommandMode };
 pub const Event = union(enum) {
     key_press: vaxis.Key,
     mouse: vaxis.Mouse,
@@ -31,6 +35,7 @@ pub const Context = struct {
     should_check_cache: bool,
     current_reload_indicator_state: ReloadIndicatorState,
     reload_indicator_active: bool,
+    current_mode: Mode,
     config: *Config,
     cache: Cache,
     buf: []u8,
@@ -314,5 +319,17 @@ pub const Context = struct {
         );
 
         if (left_aligned) col_offset.* += width;
+    }
+
+    pub fn changeMode(self: *Self, new_state: ModeType) void {
+        switch (self.current_mode) {
+            .command => |*state| state.deinit(),
+            .view => {},
+        }
+
+        switch (new_state) {
+            .view => self.current_mode = .{ .view = ViewMode.init(self) },
+            .command => self.current_mode = .{ .command = CommandMode.init(self) },
+        }
     }
 };
