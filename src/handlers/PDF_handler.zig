@@ -1,4 +1,6 @@
 const Self = @This();
+const std = @import("std");
+const types = @import("./types.zig");
 const Config = @import("../config/config.zig");
 const Utilities = @import("../utilities/utilities.zig");
 
@@ -31,4 +33,47 @@ pub fn resetZoomAndScroll(self: *Self) void {
     self.active_zoom = self.default_zoom;
     self.y_offset = 0;
     self.x_offset = 0;
+}
+
+pub fn scroll(self: *Self, direction: types.ScrollDirection) void {
+    const step = self.config.general.scroll_step / self.active_zoom;
+    switch (direction) {
+        .Up => {
+            const translation = self.y_offset + step;
+            if (self.y_offset < translation) {
+                self.y_offset = translation;
+            } else {
+                self.y_offset = std.math.nextAfter(f32, self.y_offset, std.math.inf(f32));
+            }
+        },
+        .Down => {
+            const translation = self.y_offset - step;
+            if (self.y_offset > translation) {
+                self.y_offset = translation;
+            } else {
+                self.y_offset = std.math.nextAfter(f32, self.y_offset, -std.math.inf(f32));
+            }
+        },
+        .Left => {
+            const translation = self.x_offset + step;
+            if (self.x_offset < translation) {
+                self.x_offset = translation;
+            } else {
+                self.x_offset = std.math.nextAfter(f32, self.x_offset, std.math.inf(f32));
+            }
+        },
+        .Right => {
+            const translation = self.x_offset - step;
+            if (self.x_offset > translation) {
+                self.x_offset = translation;
+            } else {
+                self.x_offset = std.math.nextAfter(f32, self.x_offset, -std.math.inf(f32));
+            }
+        },
+    }
+}
+
+pub fn offsetScroll(self: *Self, dx: f32, dy: f32) void {
+    self.x_offset -= dx;
+    self.y_offset += dy;
 }
