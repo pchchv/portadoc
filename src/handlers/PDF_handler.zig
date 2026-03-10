@@ -4,11 +4,71 @@ const types = @import("./types.zig");
 const Config = @import("../config/config.zig");
 const Utilities = @import("../utilities/utilities.zig");
 
-active_zoom: f32,
+const c = @cImport({
+    @cInclude("fitz-z.h");
+    @cInclude("mupdf/fitz.h");
+    @cInclude("mupdf/pdf.h");
+});
+
+allocator: std.mem.Allocator,
+doc: [*c]c.fz_document,
+ctx: [*c]c.fz_context,
 default_zoom: f32,
+active_zoom: f32,
+total_pages: u16,
+path: []const u8,
+width_mode: bool,
+config: *Config,
 y_offset: f32,
 x_offset: f32,
+y_center: f32,
+x_center: f32,
+
+pub fn init(
+    allocator: std.mem.Allocator,
+    path: []const u8,
 config: *Config,
+) !Self {
+    const ctx = c.fz_new_context(null, null, c.FZ_STORE_UNLIMITED) orelse {
+        std.debug.print("Failed to create mupdf context\n", .{});
+        return types.DocumentError.FailedToCreateContext;
+    };
+    errdefer c.fz_drop_context(ctx);
+
+    c.fz_register_document_handlers(ctx);
+    c.fz_set_error_callback(ctx, null, null);
+    c.fz_set_warning_callback(ctx, null, null);
+
+    const doc = c.fz_open_document_z(ctx, path.ptr) orelse {
+        const err_msg = c.fz_caught_message(ctx);
+        std.debug.print("Failed to open document: {s}\n", .{err_msg});
+        return types.DocumentError.FailedToOpenDocument;
+    };
+    errdefer c.fz_drop_document(ctx, doc);
+
+    const total_pages = @as(u16, @intCast(c.fz_count_pages(ctx, doc)));
+
+    return .{
+        .allocator = allocator,
+        .ctx = ctx,
+        .doc = doc,
+        .total_pages = total_pages,
+        .path = path,
+        .active_zoom = 0,
+        .default_zoom = 0,
+        .width_mode = false,
+        .y_offset = 0,
+        .x_offset = 0,
+        .y_center = 0,
+        .x_center = 0,
+        .config = config,
+    };
+}
+
+pub fn deinit(self: *Self) void {
+    c.fz_drop_document(self.ctx, self.doc);
+    c.fz_drop_context(self.ctx);
+}
 
 pub fn zoomIn(self: *Self) void {
     self.active_zoom *= self.config.general.zoom_step;
