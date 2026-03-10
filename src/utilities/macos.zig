@@ -1,3 +1,4 @@
+const std = @import("std");
 pub const c = @cImport({
     @cInclude("CoreGraphics/CoreGraphics.h");
 });
@@ -21,4 +22,15 @@ fn getDisplay() c.CGDirectDisplayID {
     if (c.CGGetDisplaysWithRect(win_rect, 1, &display, &disp_count) == c.kCGErrorSuccess and disp_count > 0) return display;
 
     return main_display;
+}
+
+pub fn getDPI() ?f32 {
+    const display = getDisplay();
+    if (c.CGDisplayCopyDisplayMode(display)) |mode| {
+        defer c.CGDisplayModeRelease(mode);
+        const width_px = @as(f32, @floatFromInt(c.CGDisplayModeGetPixelWidth(mode)));
+        const width_mm = @as(f32, @floatCast(c.CGDisplayScreenSize(display).width));
+        if (width_mm != 0) return std.math.round(width_px / width_mm * 25.4);
+    }
+    return null;
 }
