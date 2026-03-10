@@ -77,3 +77,17 @@ pub fn offsetScroll(self: *Self, dx: f32, dy: f32) void {
     self.x_offset -= dx;
     self.y_offset += dy;
 }
+
+pub fn getWidthMode(self: *Self) bool {
+    return self.width_mode;
+}
+
+pub fn toggleWidthMode(self: *Self) void {
+    self.default_zoom = 0;
+    self.active_zoom = 0;
+    self.width_mode = !self.width_mode;
+}
+
+pub fn toggleColor(self: *Self) void {
+    self.config.general.colorize = !self.config.general.colorize;
+}
