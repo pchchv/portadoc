@@ -176,6 +176,38 @@ pub fn renderPage(self: *Self, page_number: u16, window_width: u32, window_heigh
     }
 }
 
+pub fn reloadDocument(self: *Self) !void {
+    const retry_delay = @as(u64, @intFromFloat(self.config.general.retry_delay * @as(f64, std.time.ns_per_s)));
+    const timeout = @as(i64, @intFromFloat(self.config.general.timeout * @as(f64, std.time.ms_per_s)));
+    const start_time = std.time.milliTimestamp();
+    while (true) {
+        const now = std.time.milliTimestamp();
+        if (now - start_time > timeout) {
+            std.debug.print("Failed to reload document\n", .{});
+            return types.DocumentError.FailedToOpenDocument;
+        }
+
+        if (self.doc) |doc| {
+            c.fz_drop_document(self.ctx, doc);
+            self.doc = null;
+        }
+
+        const doc = c.fz_open_document_z(self.ctx, self.path.ptr) orelse {
+            std.Thread.sleep(retry_delay);
+            continue; // try again
+        };
+        self.doc = doc;
+
+        const page_count = c.fz_count_pages_z(self.ctx, self.doc);
+        if (page_count == 0) {
+            std.Thread.sleep(retry_delay);
+            continue; // try again
+        }
+        self.total_pages = @as(u16, @intCast(page_count));
+        return;
+    }
+}
+
 pub fn zoomIn(self: *Self) void {
     self.active_zoom *= self.config.general.zoom_step;
 }
