@@ -27,7 +27,7 @@ x_center: f32,
 pub fn init(
     allocator: std.mem.Allocator,
     path: []const u8,
-config: *Config,
+    config: *Config,
 ) !Self {
     const ctx = c.fz_new_context(null, null, c.FZ_STORE_UNLIMITED) orelse {
         std.debug.print("Failed to create mupdf context\n", .{});
@@ -68,6 +68,43 @@ config: *Config,
 pub fn deinit(self: *Self) void {
     c.fz_drop_document(self.ctx, self.doc);
     c.fz_drop_context(self.ctx);
+}
+
+fn calculateZoomLevel(self: *Self, window_width: u32, window_height: u32, bound: c.fz_rect) void {
+    var scale: f32 = 0;
+    if (self.width_mode) {
+        scale = @as(f32, @floatFromInt(window_width)) / bound.x1;
+    } else {
+        scale = @min(
+            @as(f32, @floatFromInt(window_width)) / bound.x1,
+            @as(f32, @floatFromInt(window_height)) / bound.y1,
+        );
+    }
+
+    // initial zoom
+    if (self.default_zoom == 0) {
+        self.default_zoom = scale * self.config.general.size;
+    }
+
+    if (self.active_zoom == 0) {
+        self.active_zoom = self.default_zoom;
+    }
+
+    self.active_zoom = @max(self.active_zoom, self.config.general.zoom_min);
+}
+
+fn calculateXY(self: *Self, view_width: f32, view_height: f32, bound: c.fz_rect) void {
+    // translation to center view
+    self.x_center = (bound.x1 - view_width / self.active_zoom) / 2;
+    self.y_center = (bound.y1 - view_height / self.active_zoom) / 2;
+
+    if (self.x_offset == 0 and self.y_offset == 0 and self.width_mode) {
+        self.y_offset = self.y_center;
+    }
+
+    // don't scroll off page
+    self.x_offset = c.fz_clamp(self.x_offset, -self.x_center, self.x_center);
+    self.y_offset = c.fz_clamp(self.y_offset, -self.y_center, self.y_center);
 }
 
 pub fn zoomIn(self: *Self) void {
