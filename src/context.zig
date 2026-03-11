@@ -5,6 +5,7 @@ const Cache = @import("./cache.zig");
 const Config = @import("config/config.zig");
 const ViewMode = @import("modes/view_mode.zig");
 const CommandMode = @import("modes/command_mode.zig");
+const DocumentHandler = @import("handlers/document_handler.zig");
 
 pub const panic = vaxis.panic_handler;
 pub const ModeType = enum { view, command };
@@ -34,6 +35,7 @@ pub const Context = struct {
     reload_page: bool,
     should_check_cache: bool,
     current_reload_indicator_state: ReloadIndicatorState,
+    document_handler: DocumentHandler,
     reload_indicator_active: bool,
     current_mode: Mode,
     config: *Config,
