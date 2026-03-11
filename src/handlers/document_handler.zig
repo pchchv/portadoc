@@ -1,6 +1,8 @@
 const Self = @This();
 const std = @import("std");
 const types = @import("./types.zig");
+const Config = @import("../config/config.zig");
+const PDF_handler = @import("./PDF_handler.zig");
 
 pub const FileFormat = enum {
     pdf,
@@ -11,6 +13,33 @@ pub const FileFormat = enum {
         return types.DocumentError.UnsupportedFileFormat;
     }
 };
+
+pdf_handler: PDF_handler,
+current_page_number: u16,
+file_format: FileFormat,
+
+pub fn init(allocator: std.mem.Allocator, path: []const u8, initial_page: ?u16, config: *Config) !Self {
+    const format = try FileFormat.fromPath(path);
+    var pdf_handler = try PDF_handler.init(allocator, path, config);
+    errdefer pdf_handler.deinit();
+
+    const current_page_number = if (initial_page) |page| blk: {
+        if (page < 1 or page > pdf_handler.total_pages) {
+            return types.DocumentError.InvalidPageNumber;
+        }
+        break :blk page - 1;
+    } else 0;
+
+    return .{
+        .pdf_handler = pdf_handler,
+        .current_page_number = current_page_number,
+        .file_format = format,
+    };
+}
+
+pub fn deinit(self: *Self) void {
+    self.pdf_handler.deinit();
+}
 
 pub fn getWidthMode(self: *Self) bool {
     return self.pdf_handler.getWidthMode();
