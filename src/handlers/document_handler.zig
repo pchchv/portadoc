@@ -85,3 +85,10 @@ pub fn changePage(self: *Self, delta: i32) bool {
 pub fn renderPage(self: *Self, page_number: u16, window_width: u32, window_height: u32) !types.EncodedImage {
     return try self.pdf_handler.renderPage(page_number, window_width, window_height);
 }
+
+pub fn reloadDocument(self: *Self) !void {
+    try self.pdf_handler.reloadDocument();
+    if (self.current_page_number >= self.pdf_handler.total_pages) {
+        self.current_page_number = self.pdf_handler.total_pages - 1;
+    }
+}
