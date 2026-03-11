@@ -1,4 +1,5 @@
 const Self = @This();
+const types = @import("./types.zig");
 
 pub fn getWidthMode(self: *Self) bool {
     return self.pdf_handler.getWidthMode();
@@ -46,4 +47,12 @@ pub fn resetDefaultZoom(self: *Self) void {
 
 pub fn resetZoomAndScroll(self: *Self) void {
     self.pdf_handler.resetZoomAndScroll();
+}
+
+pub fn scroll(self: *Self, direction: types.ScrollDirection) void {
+    self.pdf_handler.scroll(direction);
+}
+
+pub fn offsetScroll(self: *Self, dx: f32, dy: f32) void {
+    self.pdf_handler.offsetScroll(dx, dy);
 }
