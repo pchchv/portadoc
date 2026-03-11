@@ -46,6 +46,25 @@ pub fn init(allocator: std.mem.Allocator, config: *Config) Self {
     return self;
 }
 
+pub fn deinit(self: *Self) void {
+    if (self.config.general.history <= 0) return;
+
+    defer {
+        for (self.items.items) |entry| self.allocator.free(entry);
+        self.items.deinit(self.allocator);
+        if (self.path.len > 0) self.allocator.free(self.path);
+    }
+
+    if (std.fs.path.dirname(self.path)) |dir| std.fs.cwd().makePath(dir) catch {};
+    const file = std.fs.createFileAbsolute(self.path, .{}) catch return;
+    defer file.close();
+
+    for (self.items.items) |cmd| {
+        file.writeAll(cmd) catch continue;
+        file.writeAll("\n") catch continue;
+    }
+}
+
 pub fn addToHistory(self: *Self, cmd: []const u8) void {
     if (self.config.general.history <= 0) return;
     for (self.items.items, 0..) |existing_cmd, i| {
