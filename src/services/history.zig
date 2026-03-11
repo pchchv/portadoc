@@ -1,5 +1,50 @@
 const Self = @This();
 const std = @import("std");
+const Config = @import("../config/config.zig");
+
+allocator: std.mem.Allocator,
+items: std.ArrayList([]const u8),
+config: *Config,
+index: isize,
+path: []u8,
+
+pub fn init(allocator: std.mem.Allocator, config: *Config) Self {
+    var self = Self{
+        .allocator = allocator,
+        .config = config,
+        .items = .{},
+        .index = -1,
+        .path = "",
+    };
+
+    if (config.general.history <= 0) return self;
+
+    const home = std.process.getEnvVarOwned(allocator, "HOME") catch return self;
+    defer allocator.free(home);
+
+    if (!config.legacy_path) {
+        const xdg_state_home = std.process.getEnvVarOwned(allocator, "XDG_STATE_HOME") catch null;
+        if (xdg_state_home) |x| {
+            self.path = std.fmt.allocPrint(allocator, "{s}/fancy-cat/history", .{x}) catch return self;
+            allocator.free(x);
+        } else self.path = std.fmt.allocPrint(allocator, "{s}/.local/state/fancy-cat/history", .{home}) catch return self;
+    } else self.path = std.fmt.allocPrint(allocator, "{s}/.fancy-cat_history", .{home}) catch return self;
+
+    const content = std.fs.cwd().readFileAlloc(allocator, self.path, 1024 * 1024) catch null;
+    if (content == null) return self;
+    defer allocator.free(content.?);
+
+    var line = std.mem.tokenizeScalar(u8, content.?, '\n');
+    while (line.next()) |cmd| {
+        const cmd_copy = allocator.dupe(u8, cmd) catch continue;
+        self.items.append(allocator, cmd_copy) catch {
+            allocator.free(cmd_copy);
+            continue;
+        };
+    }
+
+    return self;
+}
 
 pub fn addToHistory(self: *Self, cmd: []const u8) void {
     if (self.config.general.history <= 0) return;
