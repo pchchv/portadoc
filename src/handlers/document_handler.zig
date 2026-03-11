@@ -1,5 +1,16 @@
 const Self = @This();
+const std = @import("std");
 const types = @import("./types.zig");
+
+pub const FileFormat = enum {
+    pdf,
+    pub fn fromPath(path: []const u8) !FileFormat {
+        if (std.mem.endsWith(u8, path, ".pdf")) {
+            return .pdf;
+        }
+        return types.DocumentError.UnsupportedFileFormat;
+    }
+};
 
 pub fn getWidthMode(self: *Self) bool {
     return self.pdf_handler.getWidthMode();
