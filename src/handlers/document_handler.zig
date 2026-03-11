@@ -27,3 +27,23 @@ pub fn getXOffset(self: *Self) f32 {
 pub fn getYOffset(self: *Self) f32 {
     return self.pdf_handler.y_offset;
 }
+
+pub fn zoomIn(self: *Self) void {
+    self.pdf_handler.zoomIn();
+}
+
+pub fn zoomOut(self: *Self) void {
+    self.pdf_handler.zoomOut();
+}
+
+pub fn setZoom(self: *Self, percent: f32) void {
+    self.pdf_handler.setZoom(percent);
+}
+
+pub fn resetDefaultZoom(self: *Self) void {
+    self.pdf_handler.resetDefaultZoom();
+}
+
+pub fn resetZoomAndScroll(self: *Self) void {
+    self.pdf_handler.resetZoomAndScroll();
+}
