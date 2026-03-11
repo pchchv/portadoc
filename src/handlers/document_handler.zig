@@ -56,3 +56,11 @@ pub fn scroll(self: *Self, direction: types.ScrollDirection) void {
 pub fn offsetScroll(self: *Self, dx: f32, dy: f32) void {
     self.pdf_handler.offsetScroll(dx, dy);
 }
+
+pub fn toggleColor(self: *Self) void {
+    self.pdf_handler.toggleColor();
+}
+
+pub fn toggleWidthMode(self: *Self) void {
+    self.pdf_handler.toggleWidthMode();
+}
