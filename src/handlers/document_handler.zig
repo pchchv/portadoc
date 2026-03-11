@@ -64,3 +64,24 @@ pub fn toggleColor(self: *Self) void {
 pub fn toggleWidthMode(self: *Self) void {
     self.pdf_handler.toggleWidthMode();
 }
+
+pub fn goToPage(self: *Self, page_num: u16) bool {
+    if (page_num >= 1 and page_num <= self.getTotalPages() and page_num != self.current_page_number + 1) {
+        self.current_page_number = @as(u16, @intCast(page_num)) - 1;
+        return true;
+    }
+    return false;
+}
+
+pub fn changePage(self: *Self, delta: i32) bool {
+    const new_page = @as(i32, @intCast(self.current_page_number)) + delta;
+    if (new_page >= 0 and new_page < self.getTotalPages()) {
+        self.current_page_number = @as(u16, @intCast(new_page));
+        return true;
+    }
+    return false;
+}
+
+pub fn renderPage(self: *Self, page_number: u16, window_width: u32, window_height: u32) !types.EncodedImage {
+    return try self.pdf_handler.renderPage(page_number, window_width, window_height);
+}
