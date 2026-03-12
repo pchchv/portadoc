@@ -51,3 +51,44 @@ pub fn notifyChange(self: *Self) void {
     self.condition.signal();
     self.mutex.unlock();
 }
+
+pub fn start(self: *Self, loop: ?*vaxis.Loop(Event)) !void {
+    self.mutex.lock();
+    self.reload_indicator_duration_ns = @as(u64, @intFromFloat(@as(f32, self.config.file_monitor.reload_indicator_duration) * std.time.ns_per_s));
+    self.loop = loop;
+    self.reload_timer = try Timer.start();
+    self.pending = false;
+    self.mutex.unlock();
+    if (self.thread == null) {
+        self.thread = try std.Thread.spawn(.{}, run, .{self});
+    }
+}
+
+fn run(self: *Self) void {
+    const check_interval_ns = self.reload_indicator_duration_ns / 4;
+    while (true) {
+        self.mutex.lock();
+        if (self.should_quit) {
+            self.mutex.unlock();
+            break;
+        }
+
+        _ = self.condition.timedWait(&self.mutex, check_interval_ns) catch {};
+        const current_loop = self.loop;
+        const generation = self.generation;
+        const pending = self.pending;
+        var elapsed_ns: u64 = 0;
+        if (self.reload_timer) |*timer| elapsed_ns = timer.read();
+
+        self.mutex.unlock();
+        if (pending and (elapsed_ns >= self.reload_indicator_duration_ns)) {
+            if (current_loop) |loop| loop.postEvent(.{ .reload_done = generation });
+
+            self.mutex.lock();
+            self.pending = false;
+            if (self.reload_timer) |*timer| timer.reset();
+
+            self.mutex.unlock();
+        }
+    }
+}
