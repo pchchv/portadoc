@@ -42,3 +42,12 @@ pub fn deinit(self: *Self) void {
         self.thread = null;
     }
 }
+
+pub fn notifyChange(self: *Self) void {
+    self.mutex.lock();
+    self.generation += 1;
+    if (self.reload_timer) |*timer| timer.reset();
+    self.pending = true;
+    self.condition.signal();
+    self.mutex.unlock();
+}
