@@ -1,8 +1,9 @@
-const vaxis = @import("vaxis");
 const std = @import("std");
+const vaxis = @import("vaxis");
 const fzwatch = @import("fzwatch");
 const Cache = @import("./cache.zig");
 const Config = @import("config/config.zig");
+const History = @import("services/history.zig");
 const ViewMode = @import("modes/view_mode.zig");
 const CommandMode = @import("modes/command_mode.zig");
 const DocumentHandler = @import("handlers/document_handler.zig");
@@ -24,6 +25,7 @@ pub const Context = struct {
 
     allocator: std.mem.Allocator,
     arena: std.heap.ArenaAllocator,
+    document_handler: DocumentHandler,
     should_quit: bool,
     tty: vaxis.Tty,
     vx: vaxis.Vaxis,
@@ -32,15 +34,15 @@ pub const Context = struct {
     current_page: ?vaxis.Image,
     watcher: ?fzwatch.Watcher,
     watcher_thread: ?std.Thread,
-    reload_page: bool,
-    should_check_cache: bool,
-    current_reload_indicator_state: ReloadIndicatorState,
-    document_handler: DocumentHandler,
-    reload_indicator_active: bool,
+    history: History,
     current_mode: Mode,
+    reload_page: bool,
     config: *Config,
     cache: Cache,
     buf: []u8,
+    should_check_cache: bool,
+    reload_indicator_active: bool,
+    current_reload_indicator_state: ReloadIndicatorState,
 
     pub fn deinit(self: *Self) void {
         switch (self.current_mode) {
