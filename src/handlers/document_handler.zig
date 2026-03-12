@@ -2,7 +2,7 @@ const Self = @This();
 const std = @import("std");
 const types = @import("./types.zig");
 const Config = @import("../config/config.zig");
-const PDF_handler = @import("./PDF_handler.zig");
+const PDF_handler = @import("./pdf_handler.zig");
 
 pub const FileFormat = enum {
     pdf,
