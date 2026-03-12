@@ -7,6 +7,7 @@ const History = @import("services/history.zig");
 const ViewMode = @import("modes/view_mode.zig");
 const CommandMode = @import("modes/command_mode.zig");
 const DocumentHandler = @import("handlers/document_handler.zig");
+const ReloadIndicatorTimer = @import("services/reload_indicator_timer.zig");
 
 pub const panic = vaxis.panic_handler;
 pub const ModeType = enum { view, command };
@@ -42,6 +43,7 @@ pub const Context = struct {
     buf: []u8,
     should_check_cache: bool,
     reload_indicator_active: bool,
+    reload_indicator_timer: ReloadIndicatorTimer,
     current_reload_indicator_state: ReloadIndicatorState,
 
     pub fn deinit(self: *Self) void {
