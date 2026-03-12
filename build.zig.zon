@@ -1,6 +1,6 @@
 .{
     .name = .portadoc,
-    .version = "0.5.0",
+    .version = "0.5.1",
     .fingerprint = 0x4ae2c2016122212,
     .minimum_zig_version = "0.15.2",
     .dependencies = .{
