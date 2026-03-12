@@ -46,6 +46,57 @@ pub const Context = struct {
     reload_indicator_timer: ReloadIndicatorTimer,
     current_reload_indicator_state: ReloadIndicatorState,
 
+    pub fn init(allocator: std.mem.Allocator, args: [][:0]u8) !Self {
+        const path = args[1];
+        const initial_page = if (args.len == 3)
+            try std.fmt.parseInt(u16, args[2], 10)
+        else
+            null;
+
+        const config = try allocator.create(Config);
+        errdefer allocator.destroy(config);
+        config.* = Config.init(allocator);
+        errdefer config.deinit();
+
+        var document_handler = try DocumentHandler.init(allocator, path, initial_page, config);
+        errdefer document_handler.deinit();
+
+        var watcher: ?fzwatch.Watcher = null;
+        if (config.file_monitor.enabled) {
+            watcher = try fzwatch.Watcher.init(allocator);
+            if (watcher) |*w| try w.addFile(path);
+        }
+
+        const vx = try vaxis.init(allocator, .{});
+        const buf = try allocator.alloc(u8, 4096);
+        const tty = try vaxis.Tty.init(buf);
+        const reload_indicator_timer = ReloadIndicatorTimer.init(config);
+        const history = History.init(allocator, config);
+        return .{
+            .allocator = allocator,
+            .arena = std.heap.ArenaAllocator.init(allocator),
+            .should_quit = false,
+            .tty = tty,
+            .vx = vx,
+            .document_handler = document_handler,
+            .page_info_text = &[_]u8{},
+            .current_page = null,
+            .watcher = watcher,
+            .mouse = null,
+            .watcher_thread = null,
+            .config = config,
+            .current_mode = undefined,
+            .history = history,
+            .reload_page = true,
+            .cache = Cache.init(allocator, config, vx, &tty),
+            .should_check_cache = config.cache.enabled,
+            .reload_indicator_timer = reload_indicator_timer,
+            .current_reload_indicator_state = .idle,
+            .reload_indicator_active = false,
+            .buf = buf,
+        };
+    }
+
     pub fn deinit(self: *Self) void {
         switch (self.current_mode) {
             .command => |*state| state.deinit(),
