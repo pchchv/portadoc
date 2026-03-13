@@ -71,3 +71,9 @@ portadoc can be configured through a JSON configuration file located in one of s
 An empty configuration file is automatically created in the primary or fallback location on the first run.
 
 An example [`config.json`](/docs/config.json) and [documentation](/docs/config.md) can be found in the [docs](/docs/) folder.
+
+# Commands
+
+portadoc uses a modal interface similar to Neovim. There are two modes: view mode and command mode. To enter command mode you type `:` by default (this can be changed in the config file).
+
+[Documentation](/docs/commands.md) on the available commands can be found in the [docs](/docs/) folder.
