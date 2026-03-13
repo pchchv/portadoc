@@ -64,3 +64,10 @@ zig build run -- <path-to-pdf> <optional-page-number>
 ```sh
 portadoc <path-to-pdf> <optional-page-number>
 ```
+
+# Configuration
+
+portadoc can be configured through a JSON configuration file located in one of several locations (primary `$XDG_CONFIG_HOME/portadoc/config.json`, fallback `$HOME/.config/portadoc/config.json`, legacy `$HOME/.portadoc`).  
+An empty configuration file is automatically created in the primary or fallback location on the first run.
+
+An example [`config.json`](/docs/config.json) and [documentation](/docs/config.md) can be found in the [docs](/docs/) folder.
