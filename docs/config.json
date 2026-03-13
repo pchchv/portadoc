@@ -1,0 +1,55 @@
+{
+  "KeyMap": {
+    "next": { "key": "n" },
+    "prev": { "key": "p" },
+    "scroll_up": { "key": "k" },
+    "scroll_down": { "key": "j" },
+    "scroll_left": { "key": "h" },
+    "scroll_right": { "key": "l" },
+    "zoom_in": { "key": "i" },
+    "zoom_out": { "key": "o" },
+    "width_mode": { "key": "w" },
+    "colorize": { "key": "z" },
+    "quit": { "key": "c", "modifiers": [ "ctrl" ] },
+    "full_screen": { "key": "f"},
+    "enter_command_mode": { "key": ":" },
+    "exit_command_mode": { "key": "escape" },
+    "execute_command": { "key": "enter" },
+    "history_back": { "key": "up" },
+    "history_forward": { "key": "down" }
+  },
+  "FileMonitor": {
+    "enabled": true,
+    "latency": 0.1,
+    "reload_indicator_duration": 1.0
+  },
+  "General": {
+    "colorize": false,
+    "white": "#000000",
+    "black": "#ffffff",
+    "size": 1.0,
+    "zoom_step": 1.25,
+    "zoom_min": 1.0,
+    "scroll_step": 100.0,
+    "retry_delay": 0.2,
+    "timeout": 5.0,
+    "detect_dpi": true,
+    "dpi": 96.0,
+    "history": 1000
+  },
+  "StatusBar": {
+    "enabled": true,
+    "style": { "bg": "#000000", "fg": "#ffffff" },
+    "items": [
+      " ",
+      { "view": { "text": "VIS" }, "command": { "text": "CMD" } },
+      "   <path> ",
+      { "idle": { "text": " " }, "reload": { "text": "*" }, "watching": { "text": " " } },
+      "<separator><page>:<total_pages> "
+    ]
+  },
+  "Cache": {
+    "enabled": true,
+    "lru_size": 10
+  }
+}
